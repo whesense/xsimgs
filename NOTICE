@@ -1,0 +1,19 @@
+xsimgs
+Copyright 2026 the xsimgs authors
+
+Licensed under the Apache License, Version 2.0 (see the LICENSE file).
+
+This product includes software derived from third-party projects:
+
+* gsplat (https://github.com/nerfstudio-project/gsplat), version 1.5.3
+  Copyright 2025 Nerfstudio Team
+  Licensed under the Apache License, Version 2.0.
+  Portions of this library are derived from gsplat, notably:
+    - csrc/rasterization/eval3d_fwd.cu, eval3d_bwd.cu,
+      eval3d_dynamic_fwd.cu, eval3d_dynamic_bwd.cu
+    - csrc/color/sh_fwd.cu, sh_bwd.cu
+  These files have been substantially modified.
+
+* GLM (https://github.com/g-truc/glm), included as a git submodule at
+  third_party/glm and bundled with source distributions.
+  Licensed under the MIT License (see third_party/glm/copying.txt).
