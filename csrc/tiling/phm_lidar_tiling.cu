@@ -1,10 +1,14 @@
 #include "tiling_common.cuh"
+#include "bind_tiling.h"
 #include "../cameras/spherical.h"
+#include <cameras/ut_kernels.h>
 
 #include <toast/utils/vector_math.h>
 #include <toast/utils/launch_helpers.h>
 #include <toast/utils/tensor_helpers.h>
 #include <cooperative_groups.h>
+#include <ATen/ops/zeros_like.h>
+#include <ATen/ops/cumsum.h>
 
 namespace cg = cooperative_groups;
 
@@ -232,19 +236,19 @@ __global__ void isect_lidar_tiles_kernel(
 
 
 
-std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> isect_lidar_tiles(
-    const torch::Tensor& camera_pack,
-    const torch::Tensor& points,
-    const std::optional<torch::Tensor>& points_velocity,
-    const torch::Tensor& scale,
-    const torch::Tensor& quat,
-    const std::optional<torch::Tensor>& opacity,
+std::tuple<at::Tensor, at::Tensor, at::Tensor> isect_lidar_tiles(
+    const at::Tensor& camera_pack,
+    const at::Tensor& points,
+    const std::optional<at::Tensor>& points_velocity,
+    const at::Tensor& scale,
+    const at::Tensor& quat,
+    const std::optional<at::Tensor>& opacity,
 
-    const torch::Tensor& flag,
-    const torch::Tensor& means2d,
-    const torch::Tensor& radii,
-    const torch::Tensor& depths,
-    const torch::Tensor& elev_boundaries,
+    const at::Tensor& flag,
+    const at::Tensor& means2d,
+    const at::Tensor& radii,
+    const at::Tensor& depths,
+    const at::Tensor& elev_boundaries,
 
     int tile_size_x,
     float img_width,
@@ -280,8 +284,8 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> isect_lidar_tiles(
     assert(tile_n_bits <= 32);
 
     // first pass: compute number of tiles per gaussian
-    torch::Tensor tiles_per_gauss =
-        torch::zeros_like(depths, depths.options().dtype(torch::kInt32));
+    at::Tensor tiles_per_gauss =
+        at::zeros_like(depths, depths.options().dtype(at::kInt));
 
     const float2 img_size{img_width, img_height};
     const float4 ut_params = ut_weights(ut_alpha, ut_beta, ut_kappa);
@@ -308,14 +312,14 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> isect_lidar_tiles(
         );
 
     const auto cum_tiles_per_gauss =
-        torch::cumsum(tiles_per_gauss.view({-1}), 0);
+        at::cumsum(tiles_per_gauss.view({-1}), 0);
     const int64_t n_isects = cum_tiles_per_gauss[-1].item<int64_t>();
 
     // second pass: compute isect_ids and flatten_ids as a packed tensor
     const auto isect_ids =
-        torch::empty({n_isects}, depths.options().dtype(torch::kInt64));
+        at::empty({n_isects}, depths.options().dtype(at::kLong));
     const auto flatten_ids =
-        torch::empty({n_isects}, depths.options().dtype(torch::kInt32));
+        at::empty({n_isects}, depths.options().dtype(at::kInt));
 
     if (!n_isects) {
         return {tiles_per_gauss, isect_ids, flatten_ids};

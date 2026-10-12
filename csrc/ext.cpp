@@ -1,4 +1,4 @@
-#include <torch/extension.h>
+#include <torch/csrc/utils/pybind.h>
 
 #include "cameras/cameras_bind.h"
 #include "color/sh_bind.h"

@@ -70,8 +70,8 @@ __global__ void isect_offset_encode_kernel(
     }
 }
 
-torch::Tensor isect_offset_encode(
-    const torch::Tensor &isect_ids, // [n_isects]
+at::Tensor isect_offset_encode(
+    const at::Tensor &isect_ids, // [n_isects]
     const uint32_t tile_width,
     const uint32_t tile_height
 ) {
@@ -79,9 +79,9 @@ torch::Tensor isect_offset_encode(
         "isect_ids must be contiguous cuda tensor")
 
     uint32_t n_isects = isect_ids.size(0);
-    auto offsets = torch::empty(
+    auto offsets = at::empty(
         {tile_height, tile_width},
-              isect_ids.options().dtype(torch::kInt32));
+              isect_ids.options().dtype(at::kInt));
 
     if (!n_isects) {
         return offsets.fill_(0);
@@ -99,10 +99,10 @@ torch::Tensor isect_offset_encode(
 }
 
 
-std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> sort_intersections(
-    const torch::Tensor &tiles_per_gauss,
-    const torch::Tensor &isect_ids,
-    const torch::Tensor &flatten_ids,
+std::tuple<at::Tensor, at::Tensor, at::Tensor> sort_intersections(
+    const at::Tensor &tiles_per_gauss,
+    const at::Tensor &isect_ids,
+    const at::Tensor &flatten_ids,
     const uint tile_n_bits,
     bool sort,
     bool double_buffer
@@ -114,8 +114,8 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> sort_intersections(
 
     // optionally sort the Gaussians by isect_ids
     if (n_isects && sort) {
-        torch::Tensor isect_ids_sorted = torch::empty_like(isect_ids);
-        torch::Tensor flatten_ids_sorted = torch::empty_like(flatten_ids);
+        at::Tensor isect_ids_sorted = at::empty_like(isect_ids);
+        at::Tensor flatten_ids_sorted = at::empty_like(flatten_ids);
 
         // https://nvidia.github.io/cccl/cub/api/structcub_1_1DeviceRadixSort.html
         // DoubleBuffer reduce the auxiliary memory usage from O(N+P) to O(P)

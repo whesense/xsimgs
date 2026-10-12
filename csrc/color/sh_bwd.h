@@ -2,7 +2,7 @@
 #define XSIMGS_SH_BWD_CUH
 
 
-#include <torch/extension.h>
+#include <torch/csrc/utils/pybind.h>
 
 void bind_sh_bwd(py::module &m);
 

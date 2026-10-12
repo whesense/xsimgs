@@ -3,6 +3,7 @@
 #include <toast/math/se3.h>
 #include <toast/utils/launch_helpers.h>
 #include <toast/utils/tensor_helpers.h>
+#include <ATen/ops/zeros_like.h>
 
 
 
@@ -85,20 +86,20 @@ __global__ void smpl_lbs_skinning_kernel(
 
 
 void smpl_lbs_skinning_fwd(
-    const torch::Tensor& valid_ids, // [B,]
-    const torch::Tensor& global_q, // [B, 24, 4]
-    const torch::Tensor& global_t, // [B, 24, 3]
-    const torch::Tensor& vertices, // [N, 6890, 3]
-    const torch::Tensor& quats,   // [N, 6890, 4]
-    const torch::Tensor& weights, // [N, 24, 6890]
-    const torch::Tensor& instance_ids,  // [N,]
-    const torch::Tensor& instance_t, // [K, 3]
-    const torch::Tensor& instance_v, // [K, 3]
+    const at::Tensor& valid_ids, // [B,]
+    const at::Tensor& global_q, // [B, 24, 4]
+    const at::Tensor& global_t, // [B, 24, 3]
+    const at::Tensor& vertices, // [N, 6890, 3]
+    const at::Tensor& quats,   // [N, 6890, 4]
+    const at::Tensor& weights, // [N, 24, 6890]
+    const at::Tensor& instance_ids,  // [N,]
+    const at::Tensor& instance_t, // [K, 3]
+    const at::Tensor& instance_v, // [K, 3]
     const uint global_offset,
-    const torch::Tensor& out_positions,
-    const torch::Tensor& out_rotations,
-    const std::optional<torch::Tensor>& out_velocities,
-    const std::optional<torch::Tensor>& out_mask
+    const at::Tensor& out_positions,
+    const at::Tensor& out_rotations,
+    const std::optional<at::Tensor>& out_velocities,
+    const std::optional<at::Tensor>& out_mask
 ) {
     const at::cuda::OptionalCUDAGuard device_guard(instance_ids.device());
 
@@ -268,35 +269,35 @@ __global__ void smpl_lbs_skinning_bwd_kernel(
 
 
 std::tuple<
-    torch::Tensor, torch::Tensor,
-    torch::Tensor, torch::Tensor, torch::Tensor,
-    torch::Tensor, torch::Tensor>
+    at::Tensor, at::Tensor,
+    at::Tensor, at::Tensor, at::Tensor,
+    at::Tensor, at::Tensor>
 smpl_lbs_skinning_bwd(
-    const torch::Tensor& valid_ids,       // [B,]
-    const torch::Tensor& instance_ids,    // [N,]
-    const torch::Tensor& global_q,        // [B, 24, 4]
-    const torch::Tensor& global_t,        // [B, 24, 3]
-    const torch::Tensor& vertices,        // [N, V, 3]
-    const torch::Tensor& quats,           // [N, V, 4]
-    const torch::Tensor& weights,         // [N, 24, V]
+    const at::Tensor& valid_ids,       // [B,]
+    const at::Tensor& instance_ids,    // [N,]
+    const at::Tensor& global_q,        // [B, 24, 4]
+    const at::Tensor& global_t,        // [B, 24, 3]
+    const at::Tensor& vertices,        // [N, V, 3]
+    const at::Tensor& quats,           // [N, V, 4]
+    const at::Tensor& weights,         // [N, 24, V]
     const uint global_offset,
     const uint num_instances,             // K
-    const torch::Tensor& grad_out_vertices,
-    const torch::Tensor& grad_out_quats,
-    const std::optional<torch::Tensor>& grad_out_velocities
+    const at::Tensor& grad_out_vertices,
+    const at::Tensor& grad_out_quats,
+    const std::optional<at::Tensor>& grad_out_velocities
 ) {
     const at::cuda::OptionalCUDAGuard device_guard(instance_ids.device());
 
     const uint num_objects  = valid_ids.numel();
     const uint num_vertices = vertices.size(1);
 
-    torch::Tensor d_global_q   = torch::zeros_like(global_q);
-    torch::Tensor d_global_t   = torch::zeros_like(global_t);
-    torch::Tensor d_vertices   = torch::zeros_like(vertices);
-    torch::Tensor d_quats      = torch::zeros_like(quats);
-    torch::Tensor d_weights    = torch::zeros_like(weights);
-    torch::Tensor d_instance_v = torch::zeros({num_instances, 3}, global_q.options());
-    torch::Tensor d_instance_t = torch::zeros({num_instances, 3}, global_q.options());
+    at::Tensor d_global_q   = at::zeros_like(global_q);
+    at::Tensor d_global_t   = at::zeros_like(global_t);
+    at::Tensor d_vertices   = at::zeros_like(vertices);
+    at::Tensor d_quats      = at::zeros_like(quats);
+    at::Tensor d_weights    = at::zeros_like(weights);
+    at::Tensor d_instance_v = at::zeros({num_instances, 3}, global_q.options());
+    at::Tensor d_instance_t = at::zeros({num_instances, 3}, global_q.options());
 
     constexpr uint num_threads = 256;
     const uint num_blocks = (num_vertices * num_objects + num_threads - 1) / num_threads;

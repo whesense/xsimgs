@@ -21,6 +21,7 @@
 #include "utils.h"
 
 #include "tile_shared_memory.h"
+#include <ATen/ops/zeros_like.h>
 
 
 #define BWD_SHMEM_LAYOUT(X) \
@@ -309,38 +310,38 @@ __global__ void rasterize_eval3d_dynamic_bwd_kernel(
 
 
 std::tuple<
-    torch::Tensor,
-    torch::Tensor,
-    torch::Tensor,
-    torch::Tensor,
-    torch::Tensor,
-    at::optional<torch::Tensor>,
-    torch::Tensor,
-    torch::Tensor,
-    torch::Tensor
+    at::Tensor,
+    at::Tensor,
+    at::Tensor,
+    at::Tensor,
+    at::Tensor,
+    at::optional<at::Tensor>,
+    at::Tensor,
+    at::Tensor,
+    at::Tensor
 > rasterize_eval3d_dynamic_bwd(
-    const torch::Tensor& points,
-    const torch::Tensor& velocity,
-    const torch::Tensor& scale,
-    const torch::Tensor& quat,
-    const torch::Tensor& opacity,
-    const at::optional<torch::Tensor>& colors,
+    const at::Tensor& points,
+    const at::Tensor& velocity,
+    const at::Tensor& scale,
+    const at::Tensor& quat,
+    const at::Tensor& opacity,
+    const at::optional<at::Tensor>& colors,
 
-    const torch::Tensor& ray_origins,
-    const torch::Tensor& ray_directions,
-    const torch::Tensor& ray_time_delta,
+    const at::Tensor& ray_origins,
+    const at::Tensor& ray_directions,
+    const at::Tensor& ray_time_delta,
     const uint32_t tile_size_x,
     const uint32_t tile_size_y,
 
-    const torch::Tensor& tile_offsets,
-    const torch::Tensor& flatten_ids,
+    const at::Tensor& tile_offsets,
+    const at::Tensor& flatten_ids,
 
-    const torch::Tensor& render_alpha,
-    const torch::Tensor& last_ids,
+    const at::Tensor& render_alpha,
+    const at::Tensor& last_ids,
 
-    const at::optional<torch::Tensor>& v_render_colors,
-    const torch::Tensor& v_render_depth,
-    const torch::Tensor& v_render_alpha
+    const at::optional<at::Tensor>& v_render_colors,
+    const at::Tensor& v_render_depth,
+    const at::Tensor& v_render_alpha
 ) {
     if (v_render_colors.has_value() && !v_render_colors->is_contiguous()) {
         throw std::runtime_error("v_render_colors must be contiguous");
@@ -363,20 +364,20 @@ std::tuple<
         .num_tiles_height = static_cast<uint32_t>(tile_offsets.size(0))
     };
 
-    torch::Tensor v_points = torch::zeros_like(points);
-    torch::Tensor v_velocity = torch::zeros_like(velocity);
-    torch::Tensor v_scale = torch::zeros_like(scale);
-    torch::Tensor v_quat = torch::zeros_like(quat);
-    torch::Tensor v_opacity = torch::zeros_like(opacity);
-    at::optional<torch::Tensor> v_colors;
+    at::Tensor v_points = at::zeros_like(points);
+    at::Tensor v_velocity = at::zeros_like(velocity);
+    at::Tensor v_scale = at::zeros_like(scale);
+    at::Tensor v_quat = at::zeros_like(quat);
+    at::Tensor v_opacity = at::zeros_like(opacity);
+    at::optional<at::Tensor> v_colors;
     uint32_t cdim = 0;
     if (colors.has_value()) {
-        v_colors = torch::zeros_like(colors.value());
+        v_colors = at::zeros_like(colors.value());
         cdim = colors->size(1);
     }
-    torch::Tensor v_ray_o = torch::zeros_like(ray_origins);
-    torch::Tensor v_ray_d = torch::zeros_like(ray_directions);
-    torch::Tensor v_time_delta = torch::zeros_like(ray_time_delta);
+    at::Tensor v_ray_o = at::zeros_like(ray_origins);
+    at::Tensor v_ray_d = at::zeros_like(ray_directions);
+    at::Tensor v_time_delta = at::zeros_like(ray_time_delta);
 
     dim3 threads = {indexing_data.tile_width, indexing_data.tile_height, 1}; \
     dim3 grid = {1, indexing_data.num_tiles_height, indexing_data.num_tiles_width}; \

@@ -5,6 +5,7 @@
 #include <toast/utils/tensor_helpers.h>
 
 #include "utils.cuh"
+#include <ATen/ops/zeros_like.h>
 
 
 
@@ -90,20 +91,20 @@ __global__ void smpl_local_to_global_fwd_kernel(
 }
 
 
-std::tuple<torch::Tensor, torch::Tensor> smpl_local_to_global_fwd(
-    const torch::Tensor& local_q_ids,  // [B,]
-    const torch::Tensor& local_q,  // [B, 24, 4]
-    const torch::Tensor& joints,  // [N, 24, 3]
-    const torch::Tensor& a0_inv_q, // [N, 24, 4]
-    const torch::Tensor& a0_inv_t  // [N, 24, 3]
+std::tuple<at::Tensor, at::Tensor> smpl_local_to_global_fwd(
+    const at::Tensor& local_q_ids,  // [B,]
+    const at::Tensor& local_q,  // [B, 24, 4]
+    const at::Tensor& joints,  // [N, 24, 3]
+    const at::Tensor& a0_inv_q, // [N, 24, 4]
+    const at::Tensor& a0_inv_t  // [N, 24, 3]
 ) {
     const at::cuda::OptionalCUDAGuard device_guard(local_q.device());
 
     const uint batch_size = local_q_ids.numel();
 
-    torch::Tensor result_q = torch::empty(
+    at::Tensor result_q = at::empty(
         {batch_size, NUM_JOINTS, 4}, local_q.options());
-    torch::Tensor result_t = torch::empty(
+    at::Tensor result_t = at::empty(
         {batch_size, NUM_JOINTS, 3}, local_q.options());
 
     constexpr uint num_objects_per_block = 16;
@@ -278,24 +279,24 @@ __global__ void smpl_local_to_global_bwd_kernel(
 }
 
 
-std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> smpl_local_to_global_bwd(
-    const torch::Tensor& local_q_ids,    // [B,]
-    const torch::Tensor& local_q,        // [N, 24, 4]
-    const torch::Tensor& joints,         // [N, 24, 3]
-    const torch::Tensor& a0_inv_q,       // [N, 24, 4]
-    const torch::Tensor& a0_inv_t,       // [N, 24, 3]
-    const torch::Tensor& output_q,
-    const torch::Tensor& output_t,
-    const torch::Tensor& grad_output_q,  // [B, 24, 4]
-    const torch::Tensor& grad_output_t   // [B, 24, 3]
+std::tuple<at::Tensor, at::Tensor, at::Tensor> smpl_local_to_global_bwd(
+    const at::Tensor& local_q_ids,    // [B,]
+    const at::Tensor& local_q,        // [N, 24, 4]
+    const at::Tensor& joints,         // [N, 24, 3]
+    const at::Tensor& a0_inv_q,       // [N, 24, 4]
+    const at::Tensor& a0_inv_t,       // [N, 24, 3]
+    const at::Tensor& output_q,
+    const at::Tensor& output_t,
+    const at::Tensor& grad_output_q,  // [B, 24, 4]
+    const at::Tensor& grad_output_t   // [B, 24, 3]
 ) {
     const uint batch_size = local_q_ids.numel();
 
     const at::cuda::OptionalCUDAGuard device_guard(local_q.device());
 
-    torch::Tensor d_local_q = torch::zeros_like(local_q);
-    torch::Tensor d_a0_inv_q = torch::zeros_like(a0_inv_q);
-    torch::Tensor d_a0_inv_t = torch::zeros_like(a0_inv_t);
+    at::Tensor d_local_q = at::zeros_like(local_q);
+    at::Tensor d_a0_inv_q = at::zeros_like(a0_inv_q);
+    at::Tensor d_a0_inv_t = at::zeros_like(a0_inv_t);
 
     constexpr uint num_objects_per_block = 16;
     dim3 threads(32, num_objects_per_block, 1);

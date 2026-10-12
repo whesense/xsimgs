@@ -4,6 +4,7 @@
 #include <toast/utils/launch_helpers.h>
 #include <toast/utils/tensor_helpers.h>
 #include <cooperative_groups.h>
+#include <ATen/ops/cumsum.h>
 
 namespace cg = cooperative_groups;
 
@@ -68,10 +69,10 @@ __global__ void isect_tiles_kernel(
 }
 
 
-std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> isect_regular_tiles(
-    const torch::Tensor& means2d,
-    const torch::Tensor& radii,
-    const torch::Tensor& depths,
+std::tuple<at::Tensor, at::Tensor, at::Tensor> isect_regular_tiles(
+    const at::Tensor& means2d,
+    const at::Tensor& radii,
+    const at::Tensor& depths,
     int img_width,
     int img_height,
     int tile_size_x,
@@ -97,7 +98,7 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> isect_regular_tiles(
     assert(tile_n_bits <= 32);
 
     auto tiles_per_gauss =
-        torch::empty_like(depths, depths.options().dtype(torch::kInt32));
+        at::empty_like(depths, depths.options().dtype(at::kInt));
 
     launch_kernel_cuda<256>(N, means2d.device(), isect_tiles_kernel<true>,
         N, tile_size, n_tiles,
@@ -107,13 +108,13 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> isect_regular_tiles(
         nullptr, (int32_t*)tiles_per_gauss.data_ptr(), nullptr, nullptr);
 
     const auto cum_tiles_per_gauss =
-        torch::cumsum(tiles_per_gauss.view({-1}), 0, torch::kInt32);
+        at::cumsum(tiles_per_gauss.view({-1}), 0, at::kInt);
     const auto n_isects = cum_tiles_per_gauss[-1].item<int32_t>();
 
     const auto isect_ids =
-        torch::empty({n_isects}, depths.options().dtype(torch::kInt64));
+        at::empty({n_isects}, depths.options().dtype(at::kLong));
     const auto flatten_ids =
-        torch::empty({n_isects}, depths.options().dtype(torch::kInt32));
+        at::empty({n_isects}, depths.options().dtype(at::kInt));
 
     if (!n_isects) {
         return {tiles_per_gauss, isect_ids, flatten_ids};

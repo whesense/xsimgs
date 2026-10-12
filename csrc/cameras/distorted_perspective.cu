@@ -10,6 +10,7 @@ struct DistortedPerspectiveCameraImpl: BaseCameraImpl {
 
     struct DistortionState {
         float scale;
+        float denom;  // denominator of the rational radial scale
         float2 delta;
         float j_uu;
         float j_uv;
@@ -53,16 +54,17 @@ struct DistortedPerspectiveCameraImpl: BaseCameraImpl {
         const float r2 = u * u + v * v;
 
         const float num = 1.0f + r2 * (k1 + r2 * (k2 + r2 * k3));
-        const float den = 1.0f + r2 * (k4 + r2 * (k5 + r2 * k6));
-        const float scale = num / den;
+        const float denom = 1.0f + r2 * (k4 + r2 * (k5 + r2 * k6));
+        const float scale = num / denom;
 
         // d(scale)/d(r2), by the quotient rule
         const float d_num = k1 + r2 * (2.0f * k2 + 3.0f * k3 * r2);
         const float d_den = k4 + r2 * (2.0f * k5 + 3.0f * k6 * r2);
-        const float d_scale = (d_num * den - num * d_den) / (den * den);
+        const float d_scale = (d_num * denom - num * d_den) / (denom * denom);
 
         return {
             .scale = scale,
+            .denom = denom,
             .delta = {
                 2.0f * p1 * u * v + p2 * (r2 + 2.0f * u * u),
                 p1 * (r2 + 2.0f * v * v) + 2.0f * p2 * u * v
@@ -112,6 +114,43 @@ struct DistortedPerspectiveCameraImpl: BaseCameraImpl {
                (fabsf(residual.x) < 1e-5f) && (fabsf(residual.y) < 1e-5f);
     }
 
+    // Gradients w.r.t. the distortion coefficients (dist0, dist1) at a solved
+    // uv_cam, by the implicit function theorem: D(uv_cam; k) = uv_distorted gives
+    // d(uv_cam)/dk = -J^{-1} dD/dk, so with g_d = J^{-T} g (state.pullback)
+    //   dL/dk = -g_d . dD/dk, where (u, v) = uv_cam, r2 = u^2 + v^2:
+    //   dD/dk_{1,2,3} =  uv_cam * r2^{1,2,3} / den
+    //   dD/dk_{4,5,6} = -uv_cam * scale * r2^{1,2,3} / den
+    //   dD/dp1 = (2 u v, r2 + 2 v^2),  dD/dp2 = (r2 + 2 u^2, 2 u v)
+    HOSTDEVICE std::tuple<float4, float4> distortion_coefficients_backward(
+        const float2& uv_cam,
+        const DistortionState& state,
+        const float2& d_uv_distorted
+    ) const {
+        const float u = uv_cam.x;
+        const float v = uv_cam.y;
+        const float r2 = u * u + v * v;
+        const float r4 = r2 * r2;
+        const float r6 = r4 * r2;
+
+        // the radial scale moves uv_cam along itself, so only g_d . uv_cam matters
+        const float d_radial = -(d_uv_distorted.x * u + d_uv_distorted.y * v) / state.denom;
+        const float d_radial_den = -d_radial * state.scale;
+
+        const float4 d_dist0 = {
+            d_radial * r2,
+            d_radial * r4,
+            -(d_uv_distorted.x * 2.0f * u * v + d_uv_distorted.y * (r2 + 2.0f * v * v)),
+            -(d_uv_distorted.x * (r2 + 2.0f * u * u) + d_uv_distorted.y * 2.0f * u * v)
+        };
+        const float4 d_dist1 = {
+            d_radial * r6,
+            d_radial_den * r2,
+            d_radial_den * r4,
+            d_radial_den * r6
+        };
+        return {d_dist0, d_dist1};
+    }
+
     template <typename SHMemType>
     __device__ __forceinline__ void pixel_to_camera_ray_backward(
         const float2& uv,
@@ -120,20 +159,36 @@ struct DistortedPerspectiveCameraImpl: BaseCameraImpl {
         SHMemType& sh_mem,
         uint base_offset
     ) const {
-        float2 inv_f{1.0f / f};
+        const float2 inv_f{1.0f / f};
+        const float2 uv_distorted = (uv - c) * inv_f;
 
+        // re-solve D(uv_cam) = uv_distorted as in the forward pass, then take the
+        // distortion state at the solution itself so that the Jacobian and the
+        // coefficient derivatives below are evaluated at the same point
         DistortionState state;
-        undistort_uv((uv - c) * inv_f, state);
+        const float2 uv_cam = undistort_uv(uv_distorted, state);
+        state = distortion_state(uv_cam);
 
-        const float2 d_uv_cam = state.pullback({d_ray.x, d_ray.y});
+        // gradient w.r.t. uv_distorted: J^{-T} d_ray.xy (J is symmetric); the
+        // degenerate-Jacobian fallback of pullback (J ~ scale * I) is shared with
+        // the coefficient gradients through the same d_uv_distorted
+        const float2 d_uv_distorted = state.pullback({d_ray.x, d_ray.y});
 
-        float4 d_params = {
-            -d_uv_cam.x * (uv.x - c.x) * inv_f.x * inv_f.x,
-            -d_uv_cam.y * (uv.y - c.y) * inv_f.y * inv_f.y,
-            -d_uv_cam.x * inv_f.x,
-            -d_uv_cam.y * inv_f.y
+        // uv_distorted = (uv - c) / f
+        const float4 d_fc = {
+            -d_uv_distorted.x * uv_distorted.x * inv_f.x,
+            -d_uv_distorted.y * uv_distorted.y * inv_f.y,
+            -d_uv_distorted.x * inv_f.x,
+            -d_uv_distorted.y * inv_f.y
         };
-        block_reduce_float4(block_outputs, base_offset, d_params)
+        const auto [d_dist0, d_dist1] =
+            distortion_coefficients_backward(uv_cam, state, d_uv_distorted);
+
+        block_reduce_float4(block_outputs, base_offset, d_fc)
+        block_reduce_float4(block_outputs,
+            base_offset + offsetof(DistortedPerspectiveCameraImpl, dist0), d_dist0)
+        block_reduce_float4(block_outputs,
+            base_offset + offsetof(DistortedPerspectiveCameraImpl, dist1), d_dist1)
     }
 
     HOSTDEVICE float3 camera_point_to_uvd(float3 point) const {

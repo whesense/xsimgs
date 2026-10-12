@@ -159,15 +159,15 @@ __global__ void spherical_harmonics_fused_fwd_kernel(
 }
 
 
-torch::Tensor spherical_harmonics_fused_fwd(
+at::Tensor spherical_harmonics_fused_fwd(
     const uint degree_to_use,
-    const torch::Tensor& origin,
-    const torch::Tensor& positions,
-    const torch::Tensor& coeffs,
-    const std::optional<torch::Tensor>& mask,
+    const at::Tensor& origin,
+    const at::Tensor& positions,
+    const at::Tensor& coeffs,
+    const std::optional<at::Tensor>& mask,
     const bool layout_3kn,
-    const std::optional<torch::Tensor>& coeffs_dc,
-    const std::optional<torch::Tensor>& output
+    const std::optional<at::Tensor>& coeffs_dc,
+    const std::optional<at::Tensor>& output
 ) {
     const bool has_dc = coeffs_dc.has_value();
     check_same_device(
@@ -210,7 +210,7 @@ torch::Tensor spherical_harmonics_fused_fwd(
     }
 
     auto out = output.has_value() ? output.value() :
-        torch::zeros({N, 3}, positions.options());
+        at::zeros({N, 3}, positions.options());
 
 #define launch_case(deg, layout_v)\
     launch_kernel_cuda(N * 3, origin.device(), \

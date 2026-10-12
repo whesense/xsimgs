@@ -2,7 +2,8 @@
 #define XSIMGS_SPHERICAL_H
 
 
-#include <cameras/bind.h>
+#include <cameras/camera.h>
+#include <cameras/base_camera_impl.h>
 
 
 HOSTDEVICE float3 spherical_to_cartesian(const float3& polar) {

@@ -6,6 +6,11 @@
 #include "projection_kernels.h"
 
 
+#define DEFAULT_UT_ALPHA 0.1f
+#define DEFAULT_UT_BETA 2.0f
+#define DEFAULT_UT_KAPPA 0.0f
+
+
 #define ALPHA_THR_MIN (1.0f/255.0f)
 
 
@@ -246,14 +251,14 @@ template <
     bool force_no_jacobians = false,
     typename CameraType
 >
-std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>//, torch::Tensor>
+std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor>//, at::Tensor>
 launch_unscented_transform(
-    const torch::Tensor& camera_pack,
-    const torch::Tensor& points,
-    const std::optional<torch::Tensor>& point_velocities,
-    const torch::Tensor& scales,
-    const torch::Tensor& quats,
-    const std::optional<torch::Tensor>& opacity,
+    const at::Tensor& camera_pack,
+    const at::Tensor& points,
+    const std::optional<at::Tensor>& point_velocities,
+    const at::Tensor& scales,
+    const at::Tensor& quats,
+    const std::optional<at::Tensor>& opacity,
     float img_width,
     float img_height,
 
@@ -268,12 +273,12 @@ launch_unscented_transform(
     check_same_device(camera_pack, points, scales, quats);
     const uint N = points.size(0);
 
-    auto flags = torch::zeros({N,},
-        at::TensorOptions(torch::kByte).device(points.device()));
-    auto radii = torch::zeros({N, 2}, points.options());
-    auto mean2d = torch::zeros({N, 2}, points.options());
-    auto depths = torch::zeros({N, }, points.options());
-    // auto cov2d = torch::zeros({N, 3}, points.options());
+    auto flags = at::zeros({N,},
+        at::TensorOptions(at::kByte).device(points.device()));
+    auto radii = at::zeros({N, 2}, points.options());
+    auto mean2d = at::zeros({N, 2}, points.options());
+    auto depths = at::zeros({N, }, points.options());
+    // auto cov2d = at::zeros({N, 3}, points.options());
 
     float4 ut_values = ut_weights(ut_alpha, ut_beta, ut_kappa);
 

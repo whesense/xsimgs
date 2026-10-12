@@ -1,4 +1,4 @@
-#include <torch/extension.h>
+#include <torch/csrc/utils/pybind.h>
 #include "voxel_grid.cuh"
 #include <toast/math/se3.h>
 #include <structs/VoxelGrid3D.h>
@@ -16,15 +16,15 @@ DEFINE_KERNEL_CAPTURE(launch_vg_voxel_coord_flt, {
 })
 
 
-torch::Tensor vg_voxel_coord_flt(
-    const torch::Tensor& vmin,
-    const torch::Tensor& vsize,
-    const torch::Tensor& points
+at::Tensor vg_voxel_coord_flt(
+    const at::Tensor& vmin,
+    const at::Tensor& vsize,
+    const at::Tensor& points
 ) {
     TORCH_CHECK(points.size(-1) == 3, "points must be [..., 3]");
     all_contiguous(points);
 
-    auto out = torch::empty_like(points);
+    auto out = at::empty_like(points);
     auto iter = make_tensor_iterator({out}, {points});
     check_operand_last_dims(iter, {3, 3});
 
@@ -43,16 +43,16 @@ DEFINE_KERNEL_CAPTURE(launch_vg_voxel_coord_clamped, {
 })
 
 
-torch::Tensor vg_voxel_coord_clamped(
-    const torch::Tensor& vmin,
-    const torch::Tensor& vmax,
-    const torch::Tensor& vsize,
-    const torch::Tensor& points
+at::Tensor vg_voxel_coord_clamped(
+    const at::Tensor& vmin,
+    const at::Tensor& vmax,
+    const at::Tensor& vsize,
+    const at::Tensor& points
 ) {
     TORCH_CHECK(points.size(-1) == 3, "points must be [..., 3]");
     check_same_dtype(vmin, vmax, vsize, points);
 
-    auto out = torch::empty(points.sizes(), points.options().dtype(torch::kInt32));
+    auto out = at::empty(points.sizes(), points.options().dtype(at::kInt));
     auto iter = make_tensor_iterator(
         {out}, {points}, {-1}, /*check_same_dtype=*/false);
     check_operand_last_dims(iter, {3, 3});
@@ -75,16 +75,16 @@ DEFINE_KERNEL_CAPTURE(launch_vg_voxel_coord_int, {
     out[offsets[0]] = make_int3(c.x, c.y, c.z);
 })
 
-torch::Tensor vg_voxel_coord_int(
-    const torch::Tensor& vmin,
-    const torch::Tensor& vmax,
-    const torch::Tensor& vsize,
-    const torch::Tensor& points
+at::Tensor vg_voxel_coord_int(
+    const at::Tensor& vmin,
+    const at::Tensor& vmax,
+    const at::Tensor& vsize,
+    const at::Tensor& points
 ) {
     TORCH_CHECK(points.size(-1) == 3, "points must be [..., 3]");
     check_same_dtype(vmin, vmax, vsize, points);
 
-    auto out = torch::empty(points.sizes(), points.options().dtype(torch::kInt32));
+    auto out = at::empty(points.sizes(), points.options().dtype(at::kInt));
     auto iter = make_tensor_iterator({out}, {points}, {-1}, /*check_same_dtype=*/false);
     check_operand_last_dims(iter, {3, 3});
     DISPATCH_KERNEL_CAPTURE(
@@ -105,16 +105,16 @@ DEFINE_KERNEL_CAPTURE(launch_vg_voxel_offset, {
 })
 
 
-torch::Tensor vg_voxel_offset(
-    const torch::Tensor& vmin,
-    const torch::Tensor& vmax,
-    const torch::Tensor& vsize,
-    const torch::Tensor& points
+at::Tensor vg_voxel_offset(
+    const at::Tensor& vmin,
+    const at::Tensor& vmax,
+    const at::Tensor& vsize,
+    const at::Tensor& points
 ) {
     check_same_dtype(vmin, vmax, vsize, points);
     auto shape = points.sizes().vec();
     shape.pop_back(); shape.push_back(1);
-    auto out = torch::empty(shape, points.options().dtype(torch::kInt64));
+    auto out = at::empty(shape, points.options().dtype(at::kLong));
     auto iter = make_tensor_iterator({out}, {points}, {-1}, /*check_same_dtype=*/false);
     check_operand_last_dims(iter, {1, 3});
     DISPATCH_KERNEL_CAPTURE(
@@ -138,16 +138,16 @@ DEFINE_KERNEL_CAPTURE(launch_vg_is_inside, {
                     & (pt.z >= vmin.z) & (pt.z < vmax.z);
 })
 
-torch::Tensor vg_is_inside(
-    const torch::Tensor& vmin,
-    const torch::Tensor& vmax,
-    const torch::Tensor& points
+at::Tensor vg_is_inside(
+    const at::Tensor& vmin,
+    const at::Tensor& vmax,
+    const at::Tensor& points
 ) {
     check_same_dtype(vmin, vmax, points);
     auto shape = points.sizes().vec();
     shape.pop_back(); shape.push_back(1);
 
-    auto out = torch::empty(shape, points.options().dtype(torch::kBool));
+    auto out = at::empty(shape, points.options().dtype(at::kBool));
     auto iter = make_tensor_iterator(
         {out}, {points}, {-1}, /*check_same_dtype=*/false);
     check_operand_last_dims(iter, {1, 3});

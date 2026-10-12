@@ -6,6 +6,7 @@
 #include <toast/math/se3.h>
 
 #include "utils.cuh"
+#include <ATen/ops/zeros_like.h>
 
 
 template <bool with_offsets>
@@ -162,24 +163,24 @@ __global__ void copy_gs_rigid_transform_bwd_kernel(
 
 
 void copy_gs_rigid_transform_fwd(
-    const torch::Tensor& positions,
-    const torch::Tensor& rotations,
-    const torch::Tensor& instance_id,
+    const at::Tensor& positions,
+    const at::Tensor& rotations,
+    const at::Tensor& instance_id,
 
-    const torch::Tensor& inst_q,
-    const torch::Tensor& inst_t,
-    const torch::Tensor& inst_v,
-    const torch::Tensor& inst_w,
-    const torch::Tensor& inst_mask,
+    const at::Tensor& inst_q,
+    const at::Tensor& inst_t,
+    const at::Tensor& inst_v,
+    const at::Tensor& inst_w,
+    const at::Tensor& inst_mask,
 
-    const torch::Tensor& out_positions,
-    const torch::Tensor& out_rotations,
-    const std::optional<torch::Tensor>& out_velocities,
-    const std::optional<torch::Tensor>& out_mask,
+    const at::Tensor& out_positions,
+    const at::Tensor& out_rotations,
+    const std::optional<at::Tensor>& out_velocities,
+    const std::optional<at::Tensor>& out_mask,
 
     uint buffer_offset,
-    const std::optional<torch::Tensor>& per_instance_offsets,
-    const std::optional<torch::Tensor>& gs_inst_offsets
+    const std::optional<at::Tensor>& per_instance_offsets,
+    const std::optional<at::Tensor>& gs_inst_offsets
 ) {
     uint num_particles = positions.size(0);
     bool with_offsets = gs_inst_offsets.has_value();
@@ -208,32 +209,32 @@ void copy_gs_rigid_transform_fwd(
 
 
 auto copy_gs_rigid_transform_bwd(
-    const torch::Tensor& positions,
-    const torch::Tensor& rotations,
-    const torch::Tensor& instance_id,
+    const at::Tensor& positions,
+    const at::Tensor& rotations,
+    const at::Tensor& instance_id,
 
-    const torch::Tensor& inst_q,
-    const torch::Tensor& inst_w,
-    const torch::Tensor& inst_mask,
+    const at::Tensor& inst_q,
+    const at::Tensor& inst_w,
+    const at::Tensor& inst_mask,
 
     uint buffer_offset,
-    const std::optional<torch::Tensor>& per_instance_offsets,
-    const std::optional<torch::Tensor>& gs_inst_offsets,
+    const std::optional<at::Tensor>& per_instance_offsets,
+    const std::optional<at::Tensor>& gs_inst_offsets,
 
-    const torch::Tensor& v_positions,
-    const torch::Tensor& v_rotations,
-    const std::optional<torch::Tensor>& v_velocities
+    const at::Tensor& v_positions,
+    const at::Tensor& v_rotations,
+    const std::optional<at::Tensor>& v_velocities
 ) {
     uint num_particles = positions.size(0);
     bool with_offsets = gs_inst_offsets.has_value();
 
-    auto grad_positions = torch::zeros_like(positions);
-    auto grad_rotations = torch::zeros_like(rotations);
+    auto grad_positions = at::zeros_like(positions);
+    auto grad_rotations = at::zeros_like(rotations);
 
-    auto grad_q = torch::zeros_like(inst_q);
-    auto grad_t = torch::zeros_like(inst_w);
-    auto grad_v = torch::zeros_like(inst_w);
-    auto grad_w = torch::zeros_like(inst_w);
+    auto grad_q = at::zeros_like(inst_q);
+    auto grad_t = at::zeros_like(inst_w);
+    auto grad_v = at::zeros_like(inst_w);
+    auto grad_w = at::zeros_like(inst_w);
 
     bool_template_launch(with_offsets, num_particles, positions.device(), copy_gs_rigid_transform_bwd_kernel,
         num_particles,

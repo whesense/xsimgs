@@ -3,13 +3,15 @@
 
 #include "camera.h"
 
+#include <torch/csrc/autograd/custom_function.h>
+
 #include <toast/utils/tensor_helpers.h>
 
 
 template <typename CameraType>
-torch::Tensor pack_camera(const std::vector<torch::Tensor>& tensors) {
+at::Tensor pack_camera(const std::vector<at::Tensor>& tensors) {
     check_same_device(tensors);
-    check_dtypes(torch::kFloat32, tensors);
+    check_dtypes(at::kFloat, tensors);
     constexpr auto total_args = (
         CameraType::tensor_dims_base.size() + CameraType::ImplType::tensor_dims.size());
     if (tensors.size() != total_args) {
@@ -29,9 +31,9 @@ torch::Tensor pack_camera(const std::vector<torch::Tensor>& tensors) {
     auto ptr_tensor_ptr = static_cast<const char **>(ptr_tensor.data_ptr());
     uint num_cameras = tensors[0].numel() / tensors[0].size(-1);
 
-    auto out = torch::zeros(
+    auto out = at::zeros(
         {num_cameras, sizeof(CameraType) / sizeof(float)},
-        at::TensorOptions().dtype(torch::kFloat32).device(ptr_tensor.device())
+        at::TensorOptions().dtype(at::kFloat).device(ptr_tensor.device())
     );
 
     const auto data = std::make_tuple(
@@ -47,7 +49,7 @@ torch::Tensor pack_camera(const std::vector<torch::Tensor>& tensors) {
 
 
 template <typename CameraType>
-std::vector<torch::Tensor> unpack_to_tensors(const torch::Tensor& pack) {
+std::vector<at::Tensor> unpack_to_tensors(const at::Tensor& pack) {
     TORCH_CHECK(
         pack.size(-1) == CameraType::pack_elements(),
         "Pack size mismatch. Expected: ",
@@ -55,14 +57,14 @@ std::vector<torch::Tensor> unpack_to_tensors(const torch::Tensor& pack) {
         ", but found: ", pack.size(-1));
 
     uint num_cameras = pack.numel() / CameraType::pack_elements();
-    std::vector<torch::Tensor> tensors;
+    std::vector<at::Tensor> tensors;
     constexpr uint num_tensors = CameraType::tensor_dims_base.size() + CameraType::ImplType::tensor_dims.size();
     tensors.reserve(num_tensors);
     for (uint i = 0; i != CameraType::tensor_dims_base.size(); ++i) {
-        tensors.push_back(torch::zeros({num_cameras, CameraType::tensor_dims_base[i]}, pack.options()));
+        tensors.push_back(at::zeros({num_cameras, CameraType::tensor_dims_base[i]}, pack.options()));
     }
     for (uint i = 0; i != CameraType::ImplType::tensor_dims.size(); ++i) {
-        tensors.push_back(torch::zeros({num_cameras, CameraType::ImplType::tensor_dims[i]}, pack.options()));
+        tensors.push_back(at::zeros({num_cameras, CameraType::ImplType::tensor_dims[i]}, pack.options()));
     }
 
     auto ptr_tensor = make_ptr_tensor(tensors);
@@ -83,13 +85,13 @@ template <typename CameraType>
 class CameraPackFunction: public torch::autograd::Function<CameraPackFunction<CameraType>> {
 public:
     template <typename... Args>
-    static torch::Tensor forward(
+    static at::Tensor forward(
         torch::autograd::AutogradContext *ctx,
         Args&&... args
     ) {
         // ctx->save_for_backward(tensors);
         return pack_camera<CameraType>(
-            std::vector<torch::Tensor>{std::forward<Args>(args)...});
+            std::vector<at::Tensor>{std::forward<Args>(args)...});
     }
 
     static torch::autograd::tensor_list backward(
@@ -103,7 +105,7 @@ public:
 
 template <typename CameraType, std::size_t... Is>
 auto pack_from_vector_impl(
-    const std::vector<torch::Tensor>& v,
+    const std::vector<at::Tensor>& v,
     std::index_sequence<Is...>
 ) {
     return CameraPackFunction<CameraType>::apply(v[Is]...);
@@ -111,7 +113,7 @@ auto pack_from_vector_impl(
 
 
 template <typename CameraType>
-torch::Tensor camera_pack(const std::vector<torch::Tensor>& tensors) {
+at::Tensor camera_pack(const std::vector<at::Tensor>& tensors) {
     constexpr uint N =
         CameraType::ImplType::tensor_dims.size() +
             CameraType::tensor_dims_base.size();

@@ -1,10 +1,12 @@
 #include "camera.h"
 
+#include <torch/csrc/autograd/custom_function.h>
+
 
 
 template <typename CameraType>
-std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> launch_camera_ray_fwd(
-    const torch::Tensor& camera,
+std::tuple<at::Tensor, at::Tensor, at::Tensor> launch_camera_ray_fwd(
+    const at::Tensor& camera,
     uint width,
     uint height,
     bool world_space,
@@ -14,10 +16,10 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> launch_camera_ray_fwd(
 ) {
     validate_camera_pack<CameraType>(camera);
     auto ray_o = return_origins ?
-        torch::empty({height, width, 3}, camera.options()) : at::Tensor();
-    auto ray_d = torch::empty({height, width, 3}, camera.options());
+        at::empty({height, width, 3}, camera.options()) : at::Tensor();
+    auto ray_d = at::empty({height, width, 3}, camera.options());
     auto valid = return_valid ?
-        torch::empty({height, width}, camera.options().dtype(torch::kBool)) :
+        at::empty({height, width}, camera.options().dtype(at::kBool)) :
         at::Tensor();
 
     const auto data = std::make_tuple(
@@ -68,11 +70,20 @@ __global__ void camera_ray_backward_kernel_cuda(
     char* block_outputs
 ) {
     const uint pixel_idx = blockDim.x * blockIdx.x + threadIdx.x;
-    if (pixel_idx >= width * height) return;
-
+    // Every thread of the block must take part in the block reductions below
+    // (cub::BlockReduce reads garbage for threads that left early), so the
+    // threads past the last pixel of a partial block stay and reduce zero
+    // gradients evaluated at the image centre, a pixel every camera model
+    // unprojects without NaNs.
+    const bool valid = pixel_idx < width * height;
     const uint2 size{width, height};
-    const int2 px{int(pixel_idx % size.x), int(pixel_idx / size.x)};
+    const int2 px = valid
+        ? int2{int(pixel_idx % size.x), int(pixel_idx / size.x)}
+        : int2{int(size.x / 2), int(size.y / 2)};
     const float2 uv = camera->pixel_to_uv(px, size);
+    const float3 zero3{0.0f, 0.0f, 0.0f};
+    const float3 grad_ray_o = valid ? d_ray_o[pixel_idx] : zero3;
+    const float3 grad_ray_d = valid ? d_ray_d[pixel_idx] : zero3;
 
     __shared__ BlockReduceType<num_threads> sh_mem;
 
@@ -80,7 +91,7 @@ __global__ void camera_ray_backward_kernel_cuda(
     if (world_space) {
         const float time_delta = camera->pixel_time_delta(uv);
         // t = t0 + delta_time * v
-        const float3 d_t = d_ray_o[pixel_idx];
+        const float3 d_t = grad_ray_o;
         block_reduce_float3(block_outputs, offsetof(CameraType, t0), d_t)
         block_reduce_float3(block_outputs, offsetof(CameraType, v), time_delta * d_t)
 
@@ -90,7 +101,7 @@ __global__ void camera_ray_backward_kernel_cuda(
 
         const auto q0_std = camera->q0.std();
         const auto q = apply_angular_velocity(q0_std, camera->w, time_delta);
-        const auto [d_q, d_norm_ray] = quatf::apply_backward(q, norm_ray, d_ray_d[pixel_idx]);
+        const auto [d_q, d_norm_ray] = quatf::apply_backward(q, norm_ray, grad_ray_d);
 
         const auto [dq0_std, dw, d_time_delta2] = apply_angular_velocity_backward(q0_std, camera->w, time_delta, d_q);
         d_time_delta += d_time_delta2;
@@ -105,8 +116,9 @@ __global__ void camera_ray_backward_kernel_cuda(
 
         d_ray = d_norm_ray;
     } else {
-        ray = camera->camera_ray_cs(uv, normalized);
-        d_ray = d_ray_d[pixel_idx];
+        // raw (unnormalized) ray: normalize_bwd below expects the pre-normalization vector
+        ray = camera->impl.pixel_to_camera_ray(uv);
+        d_ray = grad_ray_d;
     }
 
     d_ray = normalized ? normalize_bwd<Float32>(ray, d_ray): d_ray;
@@ -116,10 +128,10 @@ __global__ void camera_ray_backward_kernel_cuda(
 
 
 template <typename CameraType>
-static torch::Tensor launch_camera_ray_bwd(
-    const torch::Tensor& packed_camera,
-    const torch::Tensor& d_ray_o,
-    const torch::Tensor& d_ray_d,
+static at::Tensor launch_camera_ray_bwd(
+    const at::Tensor& packed_camera,
+    const at::Tensor& d_ray_o,
+    const at::Tensor& d_ray_d,
     bool world_space,
     bool normalized)
 {
@@ -130,7 +142,7 @@ static torch::Tensor launch_camera_ray_bwd(
     uint width = d_ray_d.size(1);
     uint num_pixels = height * width;
 
-    auto out = torch::zeros({
+    auto out = at::zeros({
         CameraType::pack_elements(),
         (num_pixels + CUDA_DEFAULT_NUM_THREADS - 1) / CUDA_DEFAULT_NUM_THREADS
     }, d_ray_d.options());
@@ -154,7 +166,7 @@ class CameraRaysFunction: public torch::autograd::Function<CameraRaysFunction<Ca
 public:
     static torch::autograd::tensor_list forward(
         torch::autograd::AutogradContext *ctx,
-        torch::Tensor packed_camera,
+        at::Tensor packed_camera,
         uint width,
         uint height,
         bool world_space,
@@ -169,9 +181,9 @@ public:
         auto rays = launch_camera_ray_fwd<CameraType>(
             packed_camera, width, height,
             world_space, normalized, return_origins, return_valid);
-        torch::Tensor ray_o = std::get<0>(rays);
-        torch::Tensor ray_d = std::get<1>(rays);
-        torch::Tensor valid = std::get<2>(rays);
+        at::Tensor ray_o = std::get<0>(rays);
+        at::Tensor ray_d = std::get<1>(rays);
+        at::Tensor valid = std::get<2>(rays);
         if (return_valid) {
             ctx->mark_non_differentiable(torch::autograd::variable_list{valid});
             return {ray_o, ray_d, valid};
@@ -190,14 +202,14 @@ public:
             grad_outputs[1],
             ctx->saved_data["world_space"].toBool(),
             ctx->saved_data["normalized"].toBool()
-        ), torch::Tensor(), torch::Tensor(), torch::Tensor(), torch::Tensor(),
-           torch::Tensor(), torch::Tensor()};
+        ), at::Tensor(), at::Tensor(), at::Tensor(), at::Tensor(),
+           at::Tensor(), at::Tensor()};
     }
 };
 
 template <typename CameraType>
 auto camera_rays_function(
-    torch::Tensor packed_camera,
+    at::Tensor packed_camera,
     uint width,
     uint height,
     bool world_space,

@@ -1,7 +1,7 @@
 #ifndef XSIMGS_BIND_TILING_H
 #define XSIMGS_BIND_TILING_H
 
-#include <torch/extension.h>
+#include <torch/csrc/utils/pybind.h>
 
 void bind_regular_tiling(py::module_& m);
 void bind_lidar_tiling(py::module_& m);

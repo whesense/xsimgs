@@ -1,7 +1,7 @@
 #ifndef XSIMGS_SH_BIND_H
 #define XSIMGS_SH_BIND_H
 
-#include <torch/extension.h>
+#include <torch/csrc/utils/pybind.h>
 
 void bind_sh(py::module_& m);
 

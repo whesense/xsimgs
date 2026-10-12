@@ -3,7 +3,7 @@
 #ifndef XSIMGS_BIND_STRUCTS_H
 #define XSIMGS_BIND_STRUCTS_H
 
-#include <torch/extension.h>
+#include <torch/csrc/utils/pybind.h>
 
 void bind_structs(py::module_& m);
 

@@ -257,10 +257,10 @@ HOSTDEVICE void camera_projection(
 
 
 template <typename CameraType, bool force_no_jacobians = false, uint num_iterations = 5>
-std::tuple<torch::Tensor, torch::Tensor> camera_projection_fwd(
-    const torch::Tensor& camera_pack,
-    const torch::Tensor& points,
-    const std::optional<torch::Tensor>& points_velocity,
+std::tuple<at::Tensor, at::Tensor> camera_projection_fwd(
+    const at::Tensor& camera_pack,
+    const at::Tensor& points,
+    const std::optional<at::Tensor>& points_velocity,
     const float residual_thr_early_stop,
     const float max_residual,
     const float max_margin,
@@ -268,10 +268,10 @@ std::tuple<torch::Tensor, torch::Tensor> camera_projection_fwd(
 ) {
     validate_camera_pack<CameraType>(camera_pack);
     const uint N = points.size(0);
-    auto out_mask = torch::empty(
+    auto out_mask = at::empty(
         {N,},
-        camera_pack.options().dtype(torch::kBool));
-    auto out_uvdt = torch::empty({N, 4}, camera_pack.options());
+        camera_pack.options().dtype(at::kBool));
+    auto out_uvdt = at::empty({N, 4}, camera_pack.options());
 
     auto data = std::make_tuple(
         (float4*)out_uvdt.data_ptr(),

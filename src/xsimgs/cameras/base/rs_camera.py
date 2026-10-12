@@ -57,9 +57,11 @@ class RSCamera(DataTensor):
             points: torch.Tensor,
             points_time: torch.Tensor
     ):
-        return self.world_se3_camera.apply_to_points(
-            points, points_time.squeeze(-1)
-        )
+        # toast wants per-point times as [..., 1], one per point
+        if points_time.ndim < points.ndim:
+            points_time = points_time.unsqueeze(-1)
+
+        return self.world_se3_camera.apply_to_points(points, points_time)
 
     def world_to_uv(
             self,
@@ -77,20 +79,22 @@ class RSCamera(DataTensor):
             fill_value=True,
             dtype=torch.bool
         )
+        # Per-point shutter time offset, [..., N]; toast takes times as [..., N, 1]
         t_h = torch.zeros_like(points[..., 0])
         residual = 0
+        motion = self.world_se3_camera
 
         for _ in range(self.N_ROLLING_ITERATIONS):
             cur_points = points
             if points_velocity is not None:
-                cur_points = cur_points + t_h * points_velocity
+                cur_points = cur_points + t_h.unsqueeze(-1) * points_velocity
 
-            assumed_time = self.world_se3_camera.pose_time + t_h
-            cam_poses = self.world_se3_camera.pose_at(assumed_time)
+            assumed_time = motion.pose_time + t_h.unsqueeze(-1)
+            cam_poses = motion.pose_at(assumed_time)
             points_cam = cam_poses.inverse_transform(cur_points)
             cur_uvd = self.camera_to_uv(points_cam)
-            real_time = self.uv_time(cur_uvd[..., :2]).squeeze(-1)
-            residual = assumed_time - real_time
+            real_time = self.uv_time(cur_uvd[..., :2])
+            residual = (assumed_time - real_time).squeeze(-1)
 
             depth = cur_uvd[..., 2]
             cur_mask = (
@@ -107,7 +111,7 @@ class RSCamera(DataTensor):
                 break
 
         valid_mask &= (residual.abs() < self.residual_max_valid)
-        uvdt = torch.cat([cur_uvd, assumed_time.unsqueeze(-1)], dim=-1)
+        uvdt = torch.cat([cur_uvd, assumed_time], dim=-1)
         return uvdt, valid_mask
 
     def uv_to_world(self, uv, depth) -> torch.Tensor:

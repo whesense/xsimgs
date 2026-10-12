@@ -51,15 +51,15 @@ __global__ void smpl_ids_compaction_kernel(
     }
 }
 
-torch::Tensor smpl_ids_compaction(
-    const torch::Tensor& instance_ids,
-    const torch::Tensor& instance_mask
+at::Tensor smpl_ids_compaction(
+    const at::Tensor& instance_ids,
+    const at::Tensor& instance_mask
 ) {
     const at::cuda::OptionalCUDAGuard device_guard(instance_ids.device());
 
-    torch::Tensor cur_ids = torch::empty(
+    at::Tensor cur_ids = at::empty(
         {instance_ids.numel()}, instance_ids.options());
-    torch::Tensor out_cnt = torch::empty({1}, instance_ids.options());
+    at::Tensor out_cnt = at::empty({1}, instance_ids.options());
 
     constexpr uint num_threads = 1024;
     const uint num_blocks = (instance_ids.numel() + num_threads - 1) / num_threads;

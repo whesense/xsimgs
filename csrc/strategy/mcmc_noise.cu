@@ -51,11 +51,11 @@ __global__ void mcmc_add_noise_kernel(
 
 
 void mcmc_add_noise(
-    torch::Tensor& positions,
-    const torch::Tensor& density,
-    const torch::Tensor& rotation,
-    const torch::Tensor& scale,
-    const torch::Tensor& noise,
+    at::Tensor& positions,
+    const at::Tensor& density,
+    const at::Tensor& rotation,
+    const at::Tensor& scale,
+    const at::Tensor& noise,
     const double k,
     const double x0,
     const double noise_scale

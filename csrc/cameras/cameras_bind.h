@@ -1,7 +1,7 @@
 #ifndef CAMERAS_BIND_H
 #define CAMERAS_BIND_H
 
-#include <torch/extension.h>
+#include <torch/csrc/utils/pybind.h>
 
 void bind_perspective(py::module_& m);
 void bind_distorted_perspective(py::module_& m);

@@ -3,6 +3,8 @@
 #include <toast/utils/vector_math.h>
 #include <toast/utils/launch_helpers.h>
 
+#include <ATen/ops/empty.h>
+
 
 __global__ void to_hwc_rgb_byte_kernel(
     const uint num_pixels,
@@ -49,15 +51,15 @@ __global__ void to_chw_rgb_byte_kernel(
 }
 
 
-std::tuple<torch::Tensor, uint, uint> check_image(const torch::Tensor& _image) {
-    torch::Tensor image = _image;
+std::tuple<at::Tensor, uint, uint> check_image(const at::Tensor& _image) {
+    at::Tensor image = _image;
     if (!image.is_cuda()) {
         throw std::runtime_error("image is not a CUDA tensor");
     }
     if (image.dim() != 3) {
         throw std::runtime_error("image must have dimensions [H, W, 3]");
     }
-    if (image.dtype() != torch::kFloat32) {
+    if (image.dtype() != at::kFloat) {
         throw std::runtime_error("image must have float32 dtype");
     }
     if (image.size(-1) != 3) {
@@ -69,11 +71,11 @@ std::tuple<torch::Tensor, uint, uint> check_image(const torch::Tensor& _image) {
     return {image, image.size(0), image.size(1)};
 }
 
-torch::Tensor image_to_hwc_rgb_byte(const torch::Tensor& _image) {
+at::Tensor image_to_hwc_rgb_byte(const at::Tensor& _image) {
     const auto [image, height, width] = check_image(_image);
-    const auto result = torch::empty(
+    const auto result = at::empty(
         {height, width, 3},
-        at::TensorOptions().device(image.device()).dtype(torch::kByte)
+        at::TensorOptions().device(image.device()).dtype(at::kByte)
     );
     launch_kernel_cuda(height * width, image.device(), to_hwc_rgb_byte_kernel,
         height * width, (float3*)image.data_ptr(), (uchar3*)result.data_ptr()
@@ -81,11 +83,11 @@ torch::Tensor image_to_hwc_rgb_byte(const torch::Tensor& _image) {
     return result;
 }
 
-torch::Tensor image_to_hwc_rgba_byte(const torch::Tensor& _image) {
+at::Tensor image_to_hwc_rgba_byte(const at::Tensor& _image) {
     const auto [image, height, width] = check_image(_image);
-    const auto result = torch::empty(
+    const auto result = at::empty(
         {height, width, 4},
-        at::TensorOptions().device(image.device()).dtype(torch::kByte)
+        at::TensorOptions().device(image.device()).dtype(at::kByte)
     );
     launch_kernel_cuda(height * width, image.device(), to_hwc_rgba_byte_kernel,
         height * width, (float3*)image.data_ptr(), (uchar4*)result.data_ptr()
@@ -93,11 +95,11 @@ torch::Tensor image_to_hwc_rgba_byte(const torch::Tensor& _image) {
     return result;
 }
 
-torch::Tensor image_to_chw_rgb_byte(const torch::Tensor& _image) {
+at::Tensor image_to_chw_rgb_byte(const at::Tensor& _image) {
     const auto [image, height, width] = check_image(_image);
-    const auto result = torch::empty(
+    const auto result = at::empty(
         {3, height, width},
-        at::TensorOptions().device(image.device()).dtype(torch::kByte)
+        at::TensorOptions().device(image.device()).dtype(at::kByte)
     );
     launch_kernel_cuda(height * width, image.device(), to_chw_rgb_byte_kernel,
         height * width, (float3*)image.data_ptr(), (unsigned char*)result.data_ptr()

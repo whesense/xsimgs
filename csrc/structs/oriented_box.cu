@@ -45,21 +45,21 @@ __global__ void point_boxes_intersection_kernel(
 }
 
 
-torch::Tensor point_boxes_intersection(
-    const torch::Tensor& points,
-    const torch::Tensor& q,
-    const torch::Tensor& t,
-    const torch::Tensor& size
+at::Tensor point_boxes_intersection(
+    const at::Tensor& points,
+    const at::Tensor& q,
+    const at::Tensor& t,
+    const at::Tensor& size
 ) {
     // p: [N, 3], q: [K, 4], t: [K, 3], size: [K, 3]
-    check_dtype_in(q, {torch::kFloat32});
+    check_dtype_in(q, {at::kFloat});
     check_same_dtype(points, q, t, size);
     check_same_device(points, q, t, size);
     const uint num_boxes = q.numel() / 4;
     const uint num_points = points.numel() / 3;
 
-    auto out = torch::empty({num_points},
-        at::TensorOptions().dtype(torch::kInt32).device(points.device()));
+    auto out = at::empty({num_points},
+        at::TensorOptions().dtype(at::kInt).device(points.device()));
 
     if (q.device().is_cuda()) {
         const at::cuda::OptionalCUDAGuard device_guard(points.device());

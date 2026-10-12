@@ -2,21 +2,21 @@
 #define XSIMGS_TILING_COMMON_CUH
 
 #include <toast/utils/vector_math.h>
-#include <torch/extension.h>
+#include <ATen/core/Tensor.h>
 
 
-std::tuple<torch::Tensor, torch::Tensor, torch::Tensor>
+std::tuple<at::Tensor, at::Tensor, at::Tensor>
 sort_intersections(
-    const torch::Tensor& tiles_per_gauss,
-    const torch::Tensor& isect_ids,
-    const torch::Tensor& flatten_ids,
+    const at::Tensor& tiles_per_gauss,
+    const at::Tensor& isect_ids,
+    const at::Tensor& flatten_ids,
     uint tile_n_bits,
     bool sort,
     bool double_buffer
 );
 
-torch::Tensor isect_offset_encode(
-    const torch::Tensor &isect_ids, // [n_isects]
+at::Tensor isect_offset_encode(
+    const at::Tensor &isect_ids, // [n_isects]
     uint32_t tile_width,
     uint32_t tile_height
 );

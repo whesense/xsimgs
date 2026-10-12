@@ -31,14 +31,14 @@ HOSTDEVICE std::tuple<float, float2> uv_distortion(
 
 
 template <typename CameraType>
-torch::Tensor undistort_map(
-    const torch::Tensor& camera_pack,
+at::Tensor undistort_map(
+    const at::Tensor& camera_pack,
     uint width,
     uint height,
     bool normalized_range
 ) {
     validate_camera_pack<CameraType>(camera_pack);
-    auto out = torch::zeros({height, width, 2}, camera_pack.options());
+    auto out = at::zeros({height, width, 2}, camera_pack.options());
 
     auto data = std::make_tuple(
         (float2*)out.data_ptr(), (CameraType*)camera_pack.data_ptr(),

@@ -1,7 +1,7 @@
 #ifndef XSIMGS_BIND_H
 #define XSIMGS_BIND_H
 
-#include <torch/extension.h>
+#include <torch/csrc/utils/pybind.h>
 
 #include "camera.h"
 #include "distortion.h"
@@ -18,9 +18,6 @@
 #define DEFAULT_TIME_RESIDUAL_EARLY_STOP 1e-4f
 #define DEFAULT_TIME_RESIDUAL_MAX 0.002f
 #define DEFAULT_MAX_MARGIN 1.0f
-#define DEFAULT_UT_ALPHA 0.1f
-#define DEFAULT_UT_BETA 2.0f
-#define DEFAULT_UT_KAPPA 0.0f
 
 
 template <typename CameraType, uint num_projection_iterations = NUM_PROJECTION_ITERATIONS>

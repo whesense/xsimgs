@@ -3,7 +3,7 @@
 
 #include <tuple>
 
-#include <torch/extension.h>
+#include <ATen/core/Tensor.h>
 
 #include <toast/utils/vector_math.h>
 #include <toast/math/motion.h>
@@ -54,10 +54,10 @@ define_has_member(ray_valid, _arg(float2))
 
 
 template <typename CameraType>
-void validate_camera_pack(const torch::Tensor& camera_pack) {
+void validate_camera_pack(const at::Tensor& camera_pack) {
     TORCH_CHECK(camera_pack.numel() == CameraType::pack_elements(),
         "Only single camera is currently supported");
-    TORCH_CHECK(camera_pack.dtype() == torch::kFloat32, "Camera type must be float32");
+    TORCH_CHECK(camera_pack.dtype() == at::kFloat, "Camera type must be float32");
     TORCH_CHECK(camera_pack.is_contiguous(), "Camera pack must be contiguous tensor");
 }
 

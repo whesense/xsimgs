@@ -1,4 +1,4 @@
-#include <torch/extension.h>
+#include <torch/csrc/utils/pybind.h>
 #include <toast/utils/vector_math.h>
 #include <toast/utils/launch_helpers.h>
 #include <toast/utils/tensor_helpers.h>
@@ -25,13 +25,13 @@ __global__ void mask_radii_packed_kernel(
 
 
 void mask_radii_packed(
-    const torch::Tensor& packed_mask,
-    const torch::Tensor& radii
+    const at::Tensor& packed_mask,
+    const at::Tensor& radii
 ) {
     if (radii.size(-1) != 2) {
         throw std::runtime_error("radii must be [..., 2] tensor");
     }
-    TORCH_CHECK(packed_mask.dtype() == torch::kUInt32, "Packed mask must be UInt32 tensor");
+    TORCH_CHECK(packed_mask.dtype() == at::kUInt32, "Packed mask must be UInt32 tensor");
 
     const uint N = radii.numel() / 2;
     TORCH_CHECK(packed_mask.numel() * 32 >= N, "Packed mask size mismatch with radii");
@@ -58,13 +58,13 @@ __global__ void mask_radii_kernel(
 }
 
 void mask_radii(
-    const torch::Tensor& mask,
-    const torch::Tensor& radii
+    const at::Tensor& mask,
+    const at::Tensor& radii
 ) {
     if (radii.size(-1) != 2) {
         throw std::runtime_error("radii must be [..., 2] tensor");
     }
-    TORCH_CHECK(mask.dtype() == torch::kBool, "Mask must be torch.bool tensor");
+    TORCH_CHECK(mask.dtype() == at::kBool, "Mask must be torch.bool tensor");
 
     const uint N = radii.numel() / 2;
     TORCH_CHECK(mask.numel() == N, "Mask size mismatch with radii");

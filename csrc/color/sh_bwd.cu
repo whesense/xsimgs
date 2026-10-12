@@ -15,6 +15,7 @@
 #include <toast/utils/tensor_helpers.h>
 
 #include <utils/reduce_helpers.cuh>
+#include <ATen/ops/zeros_like.h>
 
 template <int degree>
 HOSTDEVICE void sh_coeffs_to_color_fast_backward(
@@ -313,16 +314,16 @@ __global__ void spherical_harmonics_fused_bwd_kernel(
     }
 }
 
-std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>
+std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor>
 spherical_harmonics_fused_bwd(
     const uint degree_to_use,
-    const torch::Tensor& origin,
-    const torch::Tensor& positions,
-    const torch::Tensor& coeffs,
-    const std::optional<torch::Tensor>& mask,
+    const at::Tensor& origin,
+    const at::Tensor& positions,
+    const at::Tensor& coeffs,
+    const std::optional<at::Tensor>& mask,
     const bool layout_3kn,
-    const torch::Tensor& d_output,
-    const std::optional<torch::Tensor>& coeffs_dc
+    const at::Tensor& d_output,
+    const std::optional<at::Tensor>& coeffs_dc
 ) {
     all_contiguous(d_output);
     const bool has_dc = coeffs_dc.has_value();
@@ -332,12 +333,12 @@ spherical_harmonics_fused_bwd(
     constexpr uint num_threads = 1024;
     const uint num_blocks = (3 * N + num_threads - 1) / num_threads;
 
-    auto d_coeffs = torch::zeros_like(coeffs);
+    auto d_coeffs = at::zeros_like(coeffs);
     // Gradient for the separate zero-degree coeffs (empty when not used).
-    auto d_coeffs_dc = has_dc ? torch::zeros_like(coeffs_dc.value())
-                              : torch::empty({0}, coeffs.options());
-    auto d_positions = torch::zeros_like(positions);
-    auto d_origin_block = torch::zeros({num_blocks, 3}, origin.options());
+    auto d_coeffs_dc = has_dc ? at::zeros_like(coeffs_dc.value())
+                              : at::empty({0}, coeffs.options());
+    auto d_positions = at::zeros_like(positions);
+    auto d_origin_block = at::zeros({num_blocks, 3}, origin.options());
 
 #define launch_case(deg, layout_v)\
     launch_kernel_cuda<num_threads>(N * 3, origin.device(), \

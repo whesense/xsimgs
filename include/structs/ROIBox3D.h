@@ -6,7 +6,7 @@
 #include <tuple>
 
 template <typename dtype>
-auto tensor_to_vec3(const torch::Tensor& t) {
+auto tensor_to_vec3(const at::Tensor& t) {
     auto cpu = t.cpu().contiguous();
     const auto* d = cpu.data_ptr<typename dtype::T>();
     return typename dtype::vec3{d[0], d[1], d[2]};

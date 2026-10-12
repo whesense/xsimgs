@@ -1,12 +1,13 @@
 #include "smpl.h"
 
-#include <torch/extension.h>
+#include <torch/csrc/utils/pybind.h>
 
 #include <toast/math/se3.h>
 #include <toast/utils/launch_helpers.h>
 #include <toast/utils/tensor_helpers.h>
 
 #include "utils/reduce_helpers.cuh"
+#include <ATen/ops/zeros_like.h>
 
 
 __global__ void interpolate_smpl_poses_fwd_kernel(
@@ -58,12 +59,12 @@ __global__ void interpolate_smpl_poses_fwd_kernel(
 }
 
 
-torch::Tensor interpolate_smpl_poses_fwd(
-    const torch::Tensor& smpl_poses,  // [N, frames, 24, 4]
-    const torch::Tensor& smpl_poses_time, // [N, frames]
-    const torch::Tensor& root_q, // [K, 4]
-    const torch::Tensor& instance_ids, // [N, ]
-    const torch::Tensor& query_time
+at::Tensor interpolate_smpl_poses_fwd(
+    const at::Tensor& smpl_poses,  // [N, frames, 24, 4]
+    const at::Tensor& smpl_poses_time, // [N, frames]
+    const at::Tensor& root_q, // [K, 4]
+    const at::Tensor& instance_ids, // [N, ]
+    const at::Tensor& query_time
 ) {
     check_same_device(smpl_poses, smpl_poses_time, root_q, instance_ids, query_time);
     all_contiguous(smpl_poses, smpl_poses_time, root_q, instance_ids, query_time);
@@ -76,7 +77,7 @@ torch::Tensor interpolate_smpl_poses_fwd(
 
     const at::cuda::OptionalCUDAGuard device_guard(smpl_poses.device());
 
-    torch::Tensor out_quats = torch::empty(
+    at::Tensor out_quats = at::empty(
         {num_objects, num_joints, 4}, smpl_poses.options());
 
     constexpr int objects_per_block = 32;
@@ -188,13 +189,13 @@ __global__ void interpolate_smpl_poses_bwd_kernel(
 }
 
 
-std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> interpolate_smpl_poses_bwd(
-    const torch::Tensor& smpl_poses,       // [N, frames, 24, 4]
-    const torch::Tensor& smpl_poses_time,  // [N, frames]
-    const torch::Tensor& root_q,           // [K, 4]
-    const torch::Tensor& instance_ids,     // [N,]
-    const torch::Tensor& query_time,       // [1,]
-    const torch::Tensor& grad_out_quats    // [N, num_joints, 4]
+std::tuple<at::Tensor, at::Tensor, at::Tensor> interpolate_smpl_poses_bwd(
+    const at::Tensor& smpl_poses,       // [N, frames, 24, 4]
+    const at::Tensor& smpl_poses_time,  // [N, frames]
+    const at::Tensor& root_q,           // [K, 4]
+    const at::Tensor& instance_ids,     // [N,]
+    const at::Tensor& query_time,       // [1,]
+    const at::Tensor& grad_out_quats    // [N, num_joints, 4]
 ) {
     check_same_device(smpl_poses, smpl_poses_time, root_q, instance_ids, query_time, grad_out_quats);
     all_contiguous(smpl_poses, smpl_poses_time, root_q, instance_ids, query_time, grad_out_quats);
@@ -207,9 +208,9 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> interpolate_smpl_poses_b
 
     const at::cuda::OptionalCUDAGuard device_guard(smpl_poses.device());
 
-    torch::Tensor d_pose_quats = torch::zeros_like(smpl_poses);
-    torch::Tensor d_root_q     = torch::zeros_like(root_q);
-    torch::Tensor d_query_time = torch::zeros_like(query_time);
+    at::Tensor d_pose_quats = at::zeros_like(smpl_poses);
+    at::Tensor d_root_q     = at::zeros_like(root_q);
+    at::Tensor d_query_time = at::zeros_like(query_time);
 
     constexpr int objects_per_block = 32;
     dim3 threads(objects_per_block, num_joints, 1);

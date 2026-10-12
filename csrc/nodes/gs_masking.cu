@@ -1,6 +1,6 @@
 #include "gs_masking.h"
 
-#include <torch/extension.h>
+#include <torch/csrc/utils/pybind.h>
 #include <toast/utils/launch_helpers.h>
 #include <toast/utils/tensor_helpers.h>
 
@@ -24,16 +24,16 @@ __global__ void mask_from_instances_kernel(
 }
 
 
-torch::Tensor mask_from_instances(
-     const torch::Tensor& instance_ids,
-     const torch::Tensor& instance_mask
+at::Tensor mask_from_instances(
+     const at::Tensor& instance_ids,
+     const at::Tensor& instance_mask
 ) {
     check_same_device(instance_ids, instance_mask);
     all_contiguous(instance_ids, instance_mask);
 
     const uint N = instance_ids.numel();
-    torch::Tensor output = torch::empty({(N + 31) / 32},
-         at::TensorOptions().dtype(torch::kUInt32).device(instance_ids.device()));
+    at::Tensor output = at::empty({(N + 31) / 32},
+         at::TensorOptions().dtype(at::kUInt32).device(instance_ids.device()));
 
     launch_kernel_cuda(N, instance_ids.device(), mask_from_instances_kernel,
         N, (int*)instance_ids.data_ptr(), (char*)instance_mask.data_ptr(),

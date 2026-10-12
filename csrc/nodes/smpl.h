@@ -1,7 +1,7 @@
 #ifndef XSIMGS_SMPL_H
 #define XSIMGS_SMPL_H
 
-#include <torch/extension.h>
+#include <torch/csrc/utils/pybind.h>
 
 #define NUM_JOINTS 24
 
